@@ -61,6 +61,19 @@ What?
 
 After you've run the script for the first time, edit `mfconfig.php`. You should understand what to do.
 
+## Output
+
+Guess where output is placed: `output/`. Yeah, mind-blowing.
+
+### Server
+
+Ever heard about PHP built-in webserver? Just motherfucking use it:
+
+```
+php -S localhost:8000 -t output
+```
+> Remember that PHP built-in webserver cannot handle motherfucking HTTP 404 by itself. Il you try a non existant URL, root `index.html` will be displayed
+
 ## Writing content
 
 ### Markdown
@@ -73,7 +86,7 @@ If you don't, I don't know what shit may happen.
 
 No overkill front matter. Actually, no front matter.
 
-### Assets
+### File Assets
 
 Even though it's a motherfucking static generator, it respects your shitty cat pics.  
 Create a directory with the same name than your markdown content.
@@ -84,6 +97,12 @@ You really need an example?
 - content/2025/05/28/me-and-my-cat/my-cat.jpg
 ```
 Content assets will be placed in the same directory, so you don't have to care about the url: `![Who gives a shit about your cat, BTW?](my-cat.jpg)`
+
+### Global assets
+
+Moherfucking static generator allows you to manage your global asset. You're welcome.
+
+Just put your shit (even `.css` files, if you're crazy) in a `content/assets/` directory, they will be copied in `output/assets/` (yeah, shocking). You're a big boy or a big girl, I know you'll know what URL to use.
 
 ## Issues
 
