@@ -34,7 +34,7 @@ php fucking-build.php
 ```
 
 First time run:
-- it downloads Parsedown.php to you don't have to give a shit about it
+- it downloads Parsedown.php so you don't have to give a shit about it
 - it creates a `content/` directory with a fucking first blog post
 - it creates an `mfconfig.php` configuration file (Yeah. Configuration file. With one fucking option)
 - it creates the default motherfucking templates
@@ -56,6 +56,10 @@ You don't need this shit to build a motherfucking website.
 ## CLI options
 
 What?
+
+## Configuration
+
+After you've run the script for the first time, edit `mfconfig.php`. You should understand what to do.
 
 ## Writing content
 
