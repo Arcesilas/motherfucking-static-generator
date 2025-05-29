@@ -20,6 +20,8 @@ class MotherfuckingGenerator {
 
     private int $total_index_pages;
 
+    private array $messages;
+
     public function __construct(private readonly string|false $cwd) {
         false === $cwd and exit("getcwd() failed: WTF did you do with your current working directory?");
         $this->content_dir = "$this->cwd/content";
@@ -27,6 +29,8 @@ class MotherfuckingGenerator {
         $this->install();
         $this->parser = new Parsedown();
         $this->config = file_exists("$this->cwd/mfconfig.php") ? require $this->cwd . "/mfconfig.php" : [];
+        $lang = $this->config['lang'] ?? 'en';
+        $this->messages = ($this->config['messages'][$lang] ?? []) + getMessages($lang);
     }
 
     private function install(): void {
@@ -34,25 +38,28 @@ class MotherfuckingGenerator {
 
         if (!file_exists($parsedown)) {
             mkdirIfNotExists($this->cwd.'/lib');
-            file_put_contents(
-                $parsedown,
-                file_get_contents('https://github.com/erusev/parsedown/raw/refs/heads/master/Parsedown.php')
-            );
+            $this->download('https://github.com/erusev/parsedown/raw/refs/heads/master/Parsedown.php', $parsedown);
         }
         require $parsedown;
 
         if (!file_exists($this->content_dir)) {
             $hello_dir = $this->content_dir . '/' . date('Y/m/d');
             mkdir($hello_dir, 0750, true);
-            file_put_contents($hello_dir . '/hello-world.md', "# Hello world!\n\nThis is your mother fucking static website!");
+            file_put_contents("$hello_dir/hello-world.md", "# Hello world!\n\nThis is your mother fucking static website!");
         }
 
         if (!file_exists($this->templates_dir = $this->cwd . '/templates')) {
             mkdir($this->templates_dir, 0750, true);
-            file_put_contents($this->templates_dir . '/layout.php', getTemplateLayout());
-            file_put_contents($this->templates_dir . '/index.php', getTemplateIndex());
-            file_put_contents($this->templates_dir . '/post.php', getTemplatePost());
+            $base_url = 'Arcesilas/motherfucking-static-generator/refs/heads/main';
+            $this->download("$base_url/templates/layout", 'templates/layout.php');
+            $this->download("$base_url/templates/index", 'templates/index.php');
+            $this->download("$base_url/templates/post", 'templates/post.php');
         }
+    }
+
+    private function download(string $url, string $to)
+    {
+        file_put_contents("$this->cwd/$to", file_get_contents("https://raw.githubusercontent.com/$url"));
     }
 
     public function build(): void {
@@ -60,7 +67,7 @@ class MotherfuckingGenerator {
         $this->source_files = $this->getSourceFiles();
         if (empty($this->source_files)) {
             mkdir($this->output_dir);
-            $rendered = $this->renderTemplate('layout', ['config' => $this->config]);
+            $rendered = $this->renderTemplate('layout');
             file_put_contents("$this->output_dir/index.html", $rendered);
             return;
         }
@@ -89,7 +96,6 @@ class MotherfuckingGenerator {
         $rendered = $this->renderTemplate('post', ['post' => $post]);
         $data = [
             'body' => $rendered,
-            'config' => $this->config,
         ];
 
         mkdir($post_output_dir, 0750, true);
@@ -112,7 +118,6 @@ class MotherfuckingGenerator {
         ]);
         $rendered = $this->renderTemplate('layout', [
             'body' => $rendered,
-            'config' => $this->config,
         ]);
         $page_slug = index_url($page_num);
         $output_dir = $this->output_dir . '/' . $page_slug;
@@ -139,9 +144,8 @@ class MotherfuckingGenerator {
             if (!str_ends_with($file, '.md')) {
                 continue;
             }
-            $relative_path = substr($file, strlen($this->content_dir) + 1);
             $source_files[] = [
-                'relative_path' => $relative_path,
+                'url' => '/' . substr($file, strlen($this->content_dir) + 1, -3) . '/',
                 'pathname' => $file,
             ];
         }
@@ -177,7 +181,6 @@ class MotherfuckingGenerator {
         return $file + [
             'title' => $this->extractTitle($content),
             'content' => $content,
-            'url' => '/' . substr_replace($file['relative_path'], '/', -3),
         ];
     }
 
@@ -190,14 +193,33 @@ class MotherfuckingGenerator {
         return '';
     }
 
-    private function renderTemplate(string $path, array $vars): string
+    private function renderTemplate(string $path, array $vars = []): string
     {
+        $vars += ['config' => $this->config, 'messages' => $this->messages];
         $path = "$this->templates_dir/$path.php";
         extract($vars);
         ob_start();
         include $path;
         return ob_get_clean();
     }
+}
+
+function getMessages(string $lang = 'en'): array {
+    $messages = [
+        'en' => [
+            'previous' => 'Previous',
+            'next' => 'Next',
+            'previous_page' => 'Previous page',
+            'next_page' => 'Next page',
+        ],
+        'fr' => [
+            'previous' => 'Précédent',
+            'next' => 'Suivant',
+            'previous_page' => 'Page précédente',
+            'next_page' => 'Page suivante',
+        ],
+    ];
+    return $messages[$lang] ?? $messages['en'];
 }
 
 function getIterator(string $path): RecursiveIteratorIterator {
@@ -246,68 +268,6 @@ function index_url(int $page): ?string
         1 => '/',
         default => "/page-$page/"
     };
-}
-
-function getTemplateLayout(): string
-{
-    return <<<'layout'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title><?=htmlspecialchars($config['site_title'] ?? '')?></title>
-    <style>body{margin:40px auto;width: 100%;max-width:70ch;line-height:1.6;font-size:18px;color:#444;padding:0 10px}
-    h1,h2,h3{line-height:1.2}</style>
-</head>
-<body>
-    <?php if(isset($config['site_title'])): ?>
-    <header>
-        <h1><a href="/"><?=htmlspecialchars($config['site_title'])?></a></h1>
-    </header>
-    <?php endif; ?>
-    <main>
-        <?= isset($body) ? $body : "<p>This motherfucking static blog is fucking empty.</p>"?>
-    </main>
-    <footer>
-        <p>This motherfucking static website is powered by 
-            <a href="https://github.com/Arcesilas/motherfucking-static-generator">motherfucking static generator</a>
-        </p>
-    </footer>
-</body>
-</html>
-layout;
-}
-
-function getTemplateIndex(): string {
-    return <<<'index'
-<?php if (!empty($posts)):?>
-    <?php foreach ($posts as $post):?>
-        <article>
-            <h1><a href="<?=$post['url']?>"><?=htmlspecialchars($post['title'])?></a></h1>
-            <?=excerpt($post['content'])?>
-        </article>
-    <?php endforeach ?>
-    <nav>
-        <?php if(isset($previous_url)):?><a href="<?=$previous_url?>">&laquo; Previous</a><?php endif?>
-        <?php if(isset($next_url)):?><a href="<?=$next_url?>">Next &raquo;</a><?php endif?>
-    </nav>
-<?php else: ?>
-<p>This motherfucking static blog is fucking empty.</p>
-<?php endif ?>
-index;
-}
-
-function getTemplatePost(): string {
-    return <<<'post'
-<article>
-    <header>
-    <h1><?= $post['title']?></h1>
-    </header>
-    <?=$post['content']?>
-</article>
-<?php if(isset($post['previous'])):?><a href="<?=$post['previous']['url']?>">&laquo; Previous</a><?php endif?>
-<?php if(isset($post['next'])):?><a href="<?=$post['next']['url']?>">Next &raquo;</a><?php endif?>
-post;
 }
 
 $generator = new MotherfuckingGenerator(getcwd());
