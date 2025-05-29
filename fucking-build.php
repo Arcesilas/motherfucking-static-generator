@@ -34,13 +34,13 @@ class MotherfuckingGenerator {
     }
 
     private function install(): void {
-        $parsedown = "$this->cwd/lib/Parsedown.php";
+        $parsedown = "lib/Parsedown.php";
 
         if (!file_exists($parsedown)) {
             mkdirIfNotExists($this->cwd.'/lib');
-            $this->download('https://github.com/erusev/parsedown/raw/refs/heads/master/Parsedown.php', $parsedown);
+            $this->download('erusev/parsedown/refs/heads/master/Parsedown.php', "lib/Parsedown.php");
         }
-        require $parsedown;
+        require "$this->cwd/$parsedown";
 
         if (!file_exists($this->content_dir)) {
             $hello_dir = $this->content_dir . '/' . date('Y/m/d');
