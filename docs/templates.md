@@ -16,11 +16,27 @@ You can create an optional `page.php` file to display your pages. `post.php` wil
 ## Variables
 
 Templates are very customizable. Each template always receive the following variables:
-- `$config`: what do you think it is?
-- `$messages`: the translation messages (english and french)
+- `(array) $config`: what do you think it is?
+- `(array) $messages`: the translation messages (english and french)
 
-`post.php` and `page.php` templates also receive:
-- `$post`
+Also, templates receive specific data:
+
+### `layout.php`:
+- `$body`: the rendered content of the `post.php` or `page.php`
+
+### `post.php` and `page.php`:
+- `(array) $post` , which contains (all strings) :
+  - `title`: maybe it's the title
+  - `content`: self-explanatory
+  - `url`: the local url to the page/post (it's not a permalink)
+  - `pathname`: for technical reasons, you should not need it
+  - `next`: the next post (without next/previous)
+  - `previous`: the previous post (without next/previous)
+
+### `index.php`:
+- `(array) $posts`: an array of all posts on the page
+- `(?string) $previous_url`: url to the previous page (null on first page)
+- `(?string) $next_url`: url to the next page (null on last page)
 
 ## Helpers
 
