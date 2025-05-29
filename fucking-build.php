@@ -25,11 +25,11 @@ class MotherfuckingGenerator {
     public function __construct(private readonly string|false $cwd) {
         false === $cwd and exit("getcwd() failed: WTF did you do with your current working directory?");
         $this->content_dir = "$this->cwd/content";
-        $this->output_dir = "$this->cwd/output";
         $this->install();
         $this->parser = new Parsedown();
         $this->config = file_exists("$this->cwd/mfconfig.php") ? require $this->cwd . "/mfconfig.php" : [];
         $lang = $this->config['lang'] ?? 'en';
+        $this->output_dir = "$this->cwd/" . ($this->config['output_dir'] ?? 'output');
         $this->messages = ($this->config['messages'][$lang] ?? []) + getMessages($lang);
     }
 
@@ -64,8 +64,21 @@ class MotherfuckingGenerator {
 
     public function build(): void {
         rrmdir($this->output_dir);
-        $this->source_files = $this->getSourceFiles();
-        if (empty($this->source_files)) {
+
+        // Build pages
+        foreach ($this->getPagesFiles("$this->content_dir/pages") as $page) {
+            $page = $this->enrichFileData($page);
+            $this->buildFileWithAssets($page);
+        }
+
+        $this->copyGlobalAssets();
+
+        // Build posts
+        $posts_files = iterator_to_array($this->getSourceFiles("$this->content_dir/posts"));
+        rsort($posts_files);
+        $this->total_index_pages = (int) ceil(count($posts_files) / ($this->config["nb_per_page"] ?? 10));
+
+        if (empty($posts_files)) {
             mkdir($this->output_dir);
             $rendered = $this->renderTemplate('layout');
             file_put_contents("$this->output_dir/index.html", $rendered);
@@ -75,9 +88,9 @@ class MotherfuckingGenerator {
         $current_page = 1;
         $count = 0;
         $list = [];
-        foreach ($this->getMardownFiles() as $post) {
+        foreach ($this->getPostsFiles($posts_files) as $post) {
             $list[] = $post;
-            $this->buildPostWithAssets($post, $this->output_dir . $post['url']);
+            $this->buildFileWithAssets($post);
             $is_last_page = !isset($post['next']);
             $posts_per_page = $this->config['posts_per_page'] ?? 10;
             if (++$count === $posts_per_page || $is_last_page) {
@@ -87,25 +100,61 @@ class MotherfuckingGenerator {
                 $current_page++;
             }
         }
-
-        $this->copyGlobalAssets();
     }
 
-    private function buildPostWithAssets(array $post, string $post_output_dir): void {
-        $post['content'] = $this->parser->text($post['content']);
-        $rendered = $this->renderTemplate('post', ['post' => $post]);
+    private function getPagesFiles($pages_dir): Generator {
+        foreach ($this->getSourceFiles($pages_dir) as $file) {
+            yield $this->enrichFileData($file);
+        }
+    }
+
+    private function getPostsFiles(array $posts_files): Generator {
+        $previous = null;
+        foreach ($posts_files as $index => $file) {
+            if (!isset($file['content'])) {
+                $file = $this->enrichFileData($file);
+            }
+
+            $next = null;
+            if (isset($posts_files[$index + 1])) {
+                $next = $posts_files[$index + 1] = $this->enrichFileData($posts_files[$index + 1]);
+            }
+
+            $file_data = $file + [
+                    'previous' => $previous,
+                    'next' => $next
+                ];
+            $previous = $file;
+            yield $file_data;
+        }
+    }
+
+    private function getSourceFiles(string $content_dir): Generator {
+        $iterator = new CallbackFilterIterator(getIterator($content_dir), fn ($path) => str_ends_with($path, '.md'));
+        foreach ($iterator as $file) {
+            yield [
+                'url'      => '/' . substr($file, strlen($content_dir) + 1, -3) . '/',
+                'pathname' => $file,
+            ];
+        }
+    }
+
+    private function buildFileWithAssets(array $file, $type = 'post'): void {
+        $output_dir = $this->output_dir . $file['url'];
+        $file['content'] = $this->parser->text($file['content']);
+        $rendered = $this->renderTemplate($type, ['post' => $file]);
         $data = [
             'body' => $rendered,
         ];
 
-        mkdir($post_output_dir, 0750, true);
-        file_put_contents("$post_output_dir/index.html", $this->renderTemplate('layout', $data));
+        mkdir($output_dir, 0750, true);
+        file_put_contents("$output_dir/index.html", $this->renderTemplate('layout', $data));
 
         // File assets
-        if (is_dir($this->content_dir . $post['url'])) {
-            $assets = glob($this->content_dir . $post['url'] . '*');
+        if (is_dir($this->content_dir . $file['url'])) {
+            $assets = glob($this->content_dir . $file['url'] . '*');
             foreach ($assets as $asset) {
-                copy($asset, $post_output_dir . '/' . basename($asset));
+                copy($asset, $output_dir . '/' . basename($asset));
             }
         }
     }
@@ -137,44 +186,6 @@ class MotherfuckingGenerator {
         }
     }
 
-    private function getSourceFiles(): array {
-        $source_files = [];
-        $iterator = getIterator($this->content_dir);
-        foreach ($iterator as $file) {
-            if (!str_ends_with($file, '.md')) {
-                continue;
-            }
-            $source_files[] = [
-                'url' => '/' . substr($file, strlen($this->content_dir) + 1, -3) . '/',
-                'pathname' => $file,
-            ];
-        }
-        rsort($source_files);
-        $this->total_index_pages = (int) ceil(count($source_files) / ($this->config["nb_per_page"] ?? 10));
-        return $source_files;
-    }
-
-    private function getMardownFiles(): Generator {
-        $previous = null;
-        foreach ($this->source_files as $index => $file) {
-            if (!isset($file['content'])) {
-                $file = $this->enrichFileData($file);
-            }
-
-            $next = null;
-            if (isset($this->source_files[$index + 1])) {
-                $next = $source_files[$index + 1] = $this->enrichFileData($this->source_files[$index + 1]);
-            }
-
-            $file_data = $file + [
-                'previous' => $previous,
-                'next' => $next
-            ];
-            $previous = $file;
-            yield $file_data;
-        }
-    }
-
     private function enrichFileData(array $file): array
     {
         $content = file_get_contents($file['pathname']);
@@ -193,13 +204,13 @@ class MotherfuckingGenerator {
         return '';
     }
 
-    private function renderTemplate(string $path, array $vars = []): string
+    private function renderTemplate(string $type, array $vars = []): string
     {
         $vars += ['config' => $this->config, 'messages' => $this->messages];
-        $path = "$this->templates_dir/$path.php";
+        $type = file_exists("$this->templates_dir/$type.php") ? $type : 'post';
         extract($vars);
         ob_start();
-        include $path;
+        include "$this->templates_dir/$type.php";
         return ob_get_clean();
     }
 }
