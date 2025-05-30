@@ -37,11 +37,31 @@ Also, templates receive specific data:
 - `(array) $posts`: an array of all posts on the page
 - `(?string) $previous_url`: url to the previous page (null on first page)
 - `(?string) $next_url`: url to the next page (null on last page)
+- `(int) $total_index_pages`: total number of index pages
+- `(int) $current_page`: the number of the current page
+- `(array) $pagination`: an array with the pages to display in the pagination
+
+## Pagination
+
+The `$pagination` variable contains the minimum required to build a pagination, that is, an array with the pages numbers. `null` items represent an ellipsis. Example:
+```
+[1, 2, 3, null, 6, 7,8]
+```
+other variables available allow to build a pagination nav.
+
+The rules are:
+- the first 3 and last 3 pages are always returned
+- the current page is returned with `$config['pages_around]` pages around (obviously)
+ 
 
 ## Helpers
 
-Currently, only one helper exists to use in your templates:
-
+### Excerpt
 `excerpt(string $html, int $limit = 50, string $suffix = '…'): string`
 
 Use it to no display the whole post on index page (used in default template).
+
+### Index url
+`index_url(int $page_num): string`
+
+Simply returns the url to given index page.

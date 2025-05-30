@@ -2,6 +2,10 @@
 
 Because even a motherfucking static generator can keep track.
 
+## 2025-05-30 - Pagination is real
+
+- Real pagination replaces basic previous/next
+
 ## 2025-05-29 - It's a little better
 
 - Refactored the code with a MotherfuckingGenerator class

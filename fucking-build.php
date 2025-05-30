@@ -16,7 +16,7 @@ class MotherfuckingGenerator {
 
     private readonly Parsedown $parser;
 
-    private array $source_files = [];
+    private readonly array $source_files;
 
     private int $total_index_pages;
 
@@ -76,7 +76,7 @@ class MotherfuckingGenerator {
         // Build posts
         $posts_files = iterator_to_array($this->getSourceFiles("$this->content_dir/posts"));
         rsort($posts_files);
-        $this->total_index_pages = (int) ceil(count($posts_files) / ($this->config["nb_per_page"] ?? 10));
+        $this->total_index_pages = (int) ceil(count($posts_files) / ($this->config["posts_per_page"] ?? 10));
 
         if (empty($posts_files)) {
             mkdir($this->output_dir);
@@ -164,6 +164,9 @@ class MotherfuckingGenerator {
             'posts' => $posts,
             'previous_url' => index_url($page_num - 1),
             'next_url' => $is_last_page ? null : index_url($page_num + 1),
+            'total_index_pages' => $this->total_index_pages,
+            'current_page' => $page_num,
+            'pagination' => $this->getPagination($page_num, $this->total_index_pages),
         ]);
         $rendered = $this->renderTemplate('layout', [
             'body' => $rendered,
@@ -213,6 +216,21 @@ class MotherfuckingGenerator {
         include "$this->templates_dir/$type.php";
         return ob_get_clean();
     }
+
+    private function getPagination(int $current, int $total): array
+    {
+        $around = $this->config['pages_around'] ?? 2;
+        $pages = array_merge([1, 2, 3, $total - 2, $total -1, $total], range($current - $around, $current + $around));
+        $pages = array_filter(array_unique($pages), fn ($page) => $page > 0 && $page <= $total);
+        sort($pages);
+        foreach ($pages as $page) {
+            if ($page > ($prev ?? 0) + 1) {
+                $result[] = null;
+            }
+            $result[] = $prev = $page;
+        }
+        return $result;
+    }
 }
 
 function getMessages(string $lang = 'en'): array {
@@ -222,12 +240,14 @@ function getMessages(string $lang = 'en'): array {
             'next' => 'Next',
             'previous_page' => 'Previous page',
             'next_page' => 'Next page',
+            'aria-pagination' => 'Page navigation',
         ],
         'fr' => [
             'previous' => 'Précédent',
             'next' => 'Suivant',
             'previous_page' => 'Page précédente',
             'next_page' => 'Page suivante',
+            'aria-pagination' => 'Navigation par page',
         ],
     ];
     return $messages[$lang] ?? $messages['en'];

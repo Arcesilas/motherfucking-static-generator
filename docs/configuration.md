@@ -9,6 +9,7 @@ The configuration file is `./mfconfig.php` (yeah, it's a motherfucking configura
 Default available options are:
 - `lang` (default: `en`)
 - `output_dir` (default: `output`)
+- `pages_around` (default: `2` see [templates docs](docs/templates.md) for details)
 - `posts_per_page` (default: `10`)
 - `site_title` (default: undefined, you may not need it if you write it in your templates)
 

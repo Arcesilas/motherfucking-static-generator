@@ -21,5 +21,6 @@ The default messages are:
 - `next`
 - `previous_page`
 - `next_page`
+- `aria-pagination`: used in aria label for pagination nav
 
 You can use as many messages as you need, the appropriate ones will be injected according to the language defined.
