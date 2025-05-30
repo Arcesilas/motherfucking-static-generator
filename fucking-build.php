@@ -27,7 +27,7 @@ class MotherfuckingGenerator {
         $this->content_dir = "$this->cwd/content";
         $this->install();
         $this->parser = new Parsedown();
-        $this->config = file_exists("$this->cwd/mfconfig.php") ? require $this->cwd . "/mfconfig.php" : [];
+        $this->config = file_exists("$this->cwd/mfconfig.php") ? require "$this->cwd/mfconfig.php" : [];
         $lang = $this->config['lang'] ?? 'en';
         $this->output_dir = "$this->cwd/" . ($this->config['output_dir'] ?? 'output');
         $this->messages = ($this->config['messages'][$lang] ?? []) + getMessages($lang);
@@ -43,12 +43,12 @@ class MotherfuckingGenerator {
         require "$this->cwd/$parsedown";
 
         if (!file_exists($this->content_dir)) {
-            $hello_dir = $this->content_dir . '/' . date('Y/m/d');
+            $hello_dir = "$this->content_dir/" . date('Y/m/d');
             mkdir($hello_dir, 0750, true);
             file_put_contents("$hello_dir/hello-world.md", "# Hello world!\n\nThis is your mother fucking static website!");
         }
 
-        if (!file_exists($this->templates_dir = $this->cwd . '/templates')) {
+        if (!file_exists($this->templates_dir = "$this->cwd/templates")) {
             mkdir($this->templates_dir, 0750, true);
             $base_url = 'Arcesilas/motherfucking-static-generator/refs/heads/main';
             $this->download("$base_url/templates/layout", 'templates/layout.php');
@@ -57,8 +57,7 @@ class MotherfuckingGenerator {
         }
     }
 
-    private function download(string $url, string $to)
-    {
+    private function download(string $url, string $to) {
         file_put_contents("$this->cwd/$to", file_get_contents("https://raw.githubusercontent.com/$url"));
     }
 
@@ -154,7 +153,7 @@ class MotherfuckingGenerator {
         if (is_dir($this->content_dir . $file['url'])) {
             $assets = glob($this->content_dir . $file['url'] . '*');
             foreach ($assets as $asset) {
-                copy($asset, $output_dir . '/' . basename($asset));
+                copy($asset, "$output_dir/" . basename($asset));
             }
         }
     }
@@ -172,14 +171,14 @@ class MotherfuckingGenerator {
             'body' => $rendered,
         ]);
         $page_slug = index_url($page_num);
-        $output_dir = $this->output_dir . '/' . $page_slug;
+        $output_dir = "$this->output_dir/$page_slug";
 
         mkdirIfNotExists($output_dir, 0750, true);
         file_put_contents("$output_dir/index.html", $rendered);
     }
 
     private function copyGlobalAssets(): void {
-        $assets_dir = $this->content_dir . '/assets';
+        $assets_dir = "$this->content_dir/assets";
         if (is_dir($assets_dir)) {
             foreach (getIterator($assets_dir) as $asset) {
                 $target_path = "$this->output_dir/assets/" . substr($asset, strlen($assets_dir) + 1);
@@ -189,8 +188,7 @@ class MotherfuckingGenerator {
         }
     }
 
-    private function enrichFileData(array $file): array
-    {
+    private function enrichFileData(array $file): array {
         $content = file_get_contents($file['pathname']);
         return $file + [
             'title' => $this->extractTitle($content),
@@ -198,8 +196,7 @@ class MotherfuckingGenerator {
         ];
     }
 
-    private function extractTitle(string &$markdown): string
-    {
+    private function extractTitle(string &$markdown): string {
         if (preg_match('`^# (.+)\R+`', ltrim($markdown), $matches)) {
             $markdown = ltrim(substr($markdown, strlen($matches[0])));
             return $matches[1];
@@ -207,8 +204,7 @@ class MotherfuckingGenerator {
         return '';
     }
 
-    private function renderTemplate(string $type, array $vars = []): string
-    {
+    private function renderTemplate(string $type, array $vars = []): string {
         $vars += ['config' => $this->config, 'messages' => $this->messages];
         $type = file_exists("$this->templates_dir/$type.php") ? $type : 'post';
         extract($vars);
@@ -217,8 +213,7 @@ class MotherfuckingGenerator {
         return ob_get_clean();
     }
 
-    private function getPagination(int $current, int $total): array
-    {
+    private function getPagination(int $current, int $total): array     {
         $around = $this->config['pages_around'] ?? 2;
         $pages = array_merge([1, 2, 3, $total - 2, $total -1, $total], range($current - $around, $current + $around));
         $pages = array_filter(array_unique($pages), fn ($page) => $page > 0 && $page <= $total);
@@ -260,40 +255,29 @@ function getIterator(string $path): RecursiveIteratorIterator {
     );
 }
 
-function mkdirIfNotExists(string $dir): void
-{
+function mkdirIfNotExists(string $dir): void {
     if (!file_exists($dir)) {
         mkdir($dir, 0750, true);
     }
 }
 
-function rrmdir(string $dir): void
-{
-    if (!is_dir($dir)) {
-        return;
-    }
-
-    foreach (scandir($dir) as $item) {
-        if ($item === '.' || $item === '..') { continue; }
+function rrmdir(string $dir): void {
+    if (!is_dir($dir)) { return; }
+    $dirs = array_diff(scandir($dir), ['.', '..']);
+    foreach ($dirs as $item) {
         $path = "$dir/$item";
-        if (is_dir($path)) {
-            rrmdir($path);
-        } else {
-            unlink($path);
-        }
+        is_dir($path) ? rrmdir($path) : unlink($path);
     }
     rmdir($dir);
 }
 
-function excerpt(string $html, int $limit = 50, string $suffix = '…'): string
-{
+function excerpt(string $html, int $limit = 50, string $suffix = '…'): string {
     $words = preg_split('`\s+`', strip_tags($html));
     $excerpt = implode(' ', array_slice($words, 0, $limit));
     return  $excerpt . (count($words) > $limit ? $suffix : '');
 }
 
-function index_url(int $page): ?string
-{
+function index_url(int $page): ?string {
     return match ($page) {
         0 => null,
         1 => '/',
