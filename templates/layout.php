@@ -13,7 +13,7 @@
     </header>
     <?php endif; ?>
     <main>
-        <?= isset($body) ? $body : "<p>This motherfucking static blog is fucking empty.</p>"?>
+        <?=$body?>
     </main>
     <footer>
         <p>This motherfucking website is powered by
