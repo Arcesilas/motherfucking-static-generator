@@ -6,7 +6,7 @@ declare(strict_types=1);
 $motherfucking_time = -hrtime(true);
 
 class MotherfuckingGenerator {
-    private readonly array $config;
+    private array $config;
 
     private readonly string $content_dir;
 
@@ -22,14 +22,22 @@ class MotherfuckingGenerator {
 
     private array $messages;
 
+    private array $plugins = [];
+
+    private array $hooks = [];
+
     public function __construct(private readonly string|false $cwd) {
         false === $cwd and exit("getcwd() failed: WTF did you do with your current working directory?");
         $this->content_dir = "$this->cwd/content";
         $this->install();
-        $this->parser = new Parsedown();
         $this->config = file_exists("$this->cwd/mfconfig.php") ? require "$this->cwd/mfconfig.php" : [];
+        $this->loadPlugins($this->config['plugins'] ?? []);
+        $this->config += $this->hook('registerConfig', $this->config) ?? [];
+        $this->hook('setContentDir', $this->content_dir);
+        $this->parser = new Parsedown();
+        $this->hook('setParser', $this->parser);
         $lang = $this->config['lang'] ?? 'en';
-        $this->output_dir = "$this->cwd/" . ($this->config['output_dir'] ?? 'output');
+        $this->hook('setOutputDir', $this->output_dir = "$this->cwd/" . ($this->config['output_dir'] ?? 'output'));
         $this->messages = ($this->config['messages'][$lang] ?? []) + getMessages($lang);
     }
 
@@ -55,6 +63,7 @@ class MotherfuckingGenerator {
             $this->download("$base_url/templates/index", 'templates/index.php');
             $this->download("$base_url/templates/post", 'templates/post.php');
         }
+        $this->hook('setTemplatesDir', $this->templates_dir);
     }
 
     private function download(string $url, string $to) {
@@ -131,8 +140,9 @@ class MotherfuckingGenerator {
     private function getSourceFiles(string $content_dir): Generator {
         $iterator = new CallbackFilterIterator(getIterator($content_dir), fn ($path) => str_ends_with($path, '.md'));
         foreach ($iterator as $file) {
+            $url = '/' . substr($file, strlen($content_dir) + 1, -3) . '/';
             yield [
-                'url'      => '/' . substr($file, strlen($content_dir) + 1, -3) . '/',
+                'url'      => $this->hook('alterUrl', $url),
                 'pathname' => $file,
             ];
         }
@@ -140,6 +150,7 @@ class MotherfuckingGenerator {
 
     private function buildFileWithAssets(array $file, $type = 'post'): void {
         $output_dir = $this->output_dir . $file['url'];
+        $file['content'] = $this->hook('preParseContent', $file['content']);
         $file['content'] = $this->parser->text($file['content']);
         $rendered = $this->renderTemplate($type, ['post' => $file]);
         $data = [
@@ -153,6 +164,7 @@ class MotherfuckingGenerator {
         if (is_dir($this->content_dir . $file['url'])) {
             $assets = glob($this->content_dir . $file['url'] . '*');
             foreach ($assets as $asset) {
+                $this->hook('handleFileAsset', $asset);
                 copy($asset, "$output_dir/" . basename($asset));
             }
         }
@@ -181,6 +193,7 @@ class MotherfuckingGenerator {
         $assets_dir = "$this->content_dir/assets";
         if (is_dir($assets_dir)) {
             foreach (getIterator($assets_dir) as $asset) {
+                $this->hook('handleGlobalAsset', $asset);
                 $target_path = "$this->output_dir/assets/" . substr($asset, strlen($assets_dir) + 1);
                 mkdirIfNotExists(dirname($target_path));
                 copy($asset, $target_path);
@@ -189,11 +202,11 @@ class MotherfuckingGenerator {
     }
 
     private function enrichFileData(array $file): array {
-        $content = file_get_contents($file['pathname']);
-        return $file + [
-            'title' => $this->extractTitle($content),
-            'content' => $content,
-        ];
+        $file['content'] = file_get_contents($file['pathname']);
+        return $this->hook('enrichFileData', array_merge($file, [
+            'title' => $this->extractTitle($file['content']),
+            'content' => $file['content'],
+        ]));
     }
 
     private function extractTitle(string &$markdown): string {
@@ -204,12 +217,13 @@ class MotherfuckingGenerator {
         return '';
     }
 
-    private function renderTemplate(string $type, array $vars = []): string {
+    private function renderTemplate(string $template, array $vars = []): string {
         $vars += ['config' => $this->config, 'messages' => $this->messages];
-        $type = file_exists("$this->templates_dir/$type.php") ? $type : 'post';
+        $template = file_exists("$this->templates_dir/$template.php") ? $template : 'post';
+        $vars += $this->hook('renderTemplate', compact('template', 'vars'));
         extract($vars);
         ob_start();
-        include "$this->templates_dir/$type.php";
+        include "$this->templates_dir/$template.php";
         return ob_get_clean();
     }
 
@@ -225,6 +239,26 @@ class MotherfuckingGenerator {
             $result[] = $prev = $page;
         }
         return $result;
+    }
+
+    private function loadPlugins(array $plugins): void {
+        foreach ($plugins as $plugin) {
+            $plugin_file = "$this->cwd/plugins/$plugin/$plugin.php";
+            if (!file_exists($plugin_file)) { continue; }
+            echo "Load plugin: $plugin\n";
+            require_once "$this->cwd/plugins/$plugin/$plugin.php";
+            $instance = $this->plugins[$plugin] = new $plugin();
+            foreach ($instance->getHooks() as $hook) {
+                $this->hooks[$hook][] = $instance;
+            }
+        }
+    }
+
+    private function hook(string $hook, mixed $value = null): mixed {
+        foreach ($this->hooks[$hook] ?? [] as $plugin) {
+            $value = $plugin->$hook($value);
+        }
+        return $value;
     }
 }
 
