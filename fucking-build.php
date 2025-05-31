@@ -32,6 +32,7 @@ class MotherfuckingGenerator {
         $this->install();
         $this->config = file_exists("$this->cwd/mfconfig.php") ? require "$this->cwd/mfconfig.php" : [];
         $this->loadPlugins($this->config['plugins'] ?? []);
+        $this->hook('setGenerator', $this);
         $this->config += $this->hook('registerConfig', $this->config) ?? [];
         $this->hook('setContentDir', $this->content_dir);
         $this->parser = new Parsedown();
@@ -71,11 +72,12 @@ class MotherfuckingGenerator {
     }
 
     public function build(): void {
+        $this->hook('beforeBuild');
         rrmdir($this->output_dir);
 
         // Build pages
         foreach ($this->getPagesFiles("$this->content_dir/pages") as $page) {
-            $page = $this->enrichFileData($page);
+//            $page = $this->enrichFileData($page, 'page');
             $this->buildFileWithAssets($page);
         }
 
@@ -102,37 +104,38 @@ class MotherfuckingGenerator {
             $is_last_page = !isset($post['next']);
             $posts_per_page = $this->config['posts_per_page'] ?? 10;
             if (++$count === $posts_per_page || $is_last_page) {
-                $this->buildIndexPage($list, $current_page, $is_last_page);
+                $this->buildIndexPage($list, $current_page, $this->total_index_pages);
                 $count = 0;
                 $list = [];
                 $current_page++;
             }
         }
+        $this->hook('afterBuild');
     }
 
     private function getPagesFiles($pages_dir): Generator {
         foreach ($this->getSourceFiles($pages_dir) as $file) {
-            yield $this->enrichFileData($file);
+            yield $this->enrichFileData($file, 'page');
         }
     }
 
     private function getPostsFiles(array $posts_files): Generator {
         $previous = null;
-        foreach ($posts_files as $index => $file) {
+        foreach ($posts_files as $index => &$file) {
             if (!isset($file['content'])) {
-                $file = $this->enrichFileData($file);
+                $posts_files[$index] = $this->enrichFileData($file, 'post');
             }
 
             $next = null;
             if (isset($posts_files[$index + 1])) {
-                $next = $posts_files[$index + 1] = $this->enrichFileData($posts_files[$index + 1]);
+                $next = $posts_files[$index + 1] = $this->enrichFileData($posts_files[$index + 1], 'post');
             }
 
-            $file_data = $file + [
+            $file_data = $posts_files[$index] + [
                     'previous' => $previous,
                     'next' => $next
                 ];
-            $previous = $file;
+            $previous = $posts_files[$index];
             yield $file_data;
         }
     }
@@ -170,19 +173,27 @@ class MotherfuckingGenerator {
         }
     }
 
-    private function buildIndexPage(array $posts, int $page_num, $is_last_page): void {
-        $rendered = $this->renderTemplate('index', [
+    public function buildIndexPage(
+        array $posts,
+        int $page_num,
+        int $total_pages,
+        string $base_url = '',
+        string $template = 'index',
+        string $title = null
+    ): void {
+        $rendered = $this->renderTemplate($template, [
+            'title' => $title,
             'posts' => $posts,
-            'previous_url' => index_url($page_num - 1),
-            'next_url' => $is_last_page ? null : index_url($page_num + 1),
-            'total_index_pages' => $this->total_index_pages,
+            'previous_url' => index_url($page_num - 1, $base_url),
+            'next_url' => ($page_num === $total_pages) ? null : index_url($page_num + 1, $base_url),
+            'total_index_pages' => $total_pages,
             'current_page' => $page_num,
-            'pagination' => $this->getPagination($page_num, $this->total_index_pages),
+            'pagination' => $this->getPagination($page_num, $total_pages),
         ]);
         $rendered = $this->renderTemplate('layout', [
             'body' => $rendered,
         ]);
-        $page_slug = index_url($page_num);
+        $page_slug = index_url($page_num, $base_url);
         $output_dir = "$this->output_dir/$page_slug";
 
         mkdirIfNotExists($output_dir, 0750, true);
@@ -201,20 +212,26 @@ class MotherfuckingGenerator {
         }
     }
 
-    private function enrichFileData(array $file): array {
-        $file['content'] = file_get_contents($file['pathname']);
+    private function enrichFileData(array $file, string $type): array {
+        $file['raw_content'] = $content = file_get_contents($file['pathname']);
         return $this->hook('enrichFileData', array_merge($file, [
-            'title' => $this->extractTitle($file['content']),
-            'content' => $file['content'],
+            'title' => $this->extractTitle($content),
+            'content' => $content,
+            'type' => $type,
         ]));
     }
 
     private function extractTitle(string &$markdown): string {
+        $markdown = $this->stripComments($markdown);
         if (preg_match('`^# (.+)\R+`', ltrim($markdown), $matches)) {
             $markdown = ltrim(substr($markdown, strlen($matches[0])));
             return $matches[1];
         }
         return '';
+    }
+
+    public function stripComments(string $content): string {
+        return preg_replace('`^\[//]: # (.*)$`m', '', $content);
     }
 
     private function renderTemplate(string $template, array $vars = []): string {
@@ -245,7 +262,7 @@ class MotherfuckingGenerator {
         foreach ($plugins as $plugin) {
             $plugin_file = "$this->cwd/plugins/$plugin/$plugin.php";
             if (!file_exists($plugin_file)) { continue; }
-            echo "Load plugin: $plugin\n";
+
             require_once "$this->cwd/plugins/$plugin/$plugin.php";
             $instance = $this->plugins[$plugin] = new $plugin();
             foreach ($instance->getHooks() as $hook) {
@@ -311,11 +328,11 @@ function excerpt(string $html, int $limit = 50, string $suffix = '…'): string 
     return  $excerpt . (count($words) > $limit ? $suffix : '');
 }
 
-function index_url(int $page): ?string {
+function index_url(int $page, string $base_url = ''): ?string {
     return match ($page) {
         0 => null,
-        1 => '/',
-        default => "/page-$page/"
+        1 => $base_url ? "/$base_url/" : "/",
+        default => $base_url ? "/$base_url/page-$page/" : "/page-$page/",
     };
 }
 

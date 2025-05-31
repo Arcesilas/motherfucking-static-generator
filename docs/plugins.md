@@ -26,9 +26,12 @@ Hooks can be:
 - `setContentDir(string $content_dir)`
 - `setOutputDir(string $output_dir): void`
 - `setTemplatesDir(string $templates_dir): void`
+- `setGenerator(MotherfuckingGenerator $generator): void`
 - `setParser(Parsedown $parsedown): void`
 - `handleFileAsset(string $asset): void`
 - `handleGlobalAsset(string $asset): void`
+- `beforeBuild(): void`
+- `afterBuild(): void`
 - `= alterUrl(string $original_url): string $new_url`
 - `+= registerConfig(array $configuration): array $config`
 - `+= enrichFileData(array $file): array $file`
@@ -36,6 +39,7 @@ Hooks can be:
 
 About the variables:
 - `$content_dir`, `$output_dir`, `$templates_dir`: you don't need a schema, do you?
+- `$generator`: the MotherfuckingGenerator instance
 - `$parsedown`: the Parsedown instance.
 - `$configuration`: the global configuration from `./mfconfig.php`
 - `$file` is an array as described in the [templates docs](templates.md)
