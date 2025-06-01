@@ -230,8 +230,8 @@ class MotherfuckingGenerator {
         return '';
     }
 
-    public function stripComments(string &$content): string {
-        return preg_replace('`^\[//]: # (.*)$`m', '', $content);
+    public function stripComments(string &$content): void {
+        $content = preg_replace('`^\[//]: # (.*)$`m', '', $content);
     }
 
     private function renderTemplate(string $template, array $vars = []): string {
