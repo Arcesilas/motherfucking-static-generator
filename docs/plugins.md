@@ -3,13 +3,14 @@
 This motherfucking static generator has a motherfucking plugin system. Yeah. 2 methods, 2 properties and 8 lines of code. No useless shit.
 
 **Convention > Configuration**:
-Considering a `FooPlugin`
-- The plugin must be `FooPlugin/FooPlugin.php` and placed in `plugins/` directory
+- Plugins name must be in kebab-case, with `php-plugin` prefix: `php-plugin-foo-bar-baz`. this must be the name of the directory in the `plugins/` folder
+- The plugin file must be in PascalCase, with `.php` suffix: `FooBarBaz.php`
+- The plugin class must be the same as the file (without prefix, and without a namespace): `FooBarBaz`
 - The plugin class must have a public method `getHooks(): array`
 
 Respect the conventions, or it breaks. As it should.
 
-To disable a plugin, just rename the directory, for instance: `_FooPlugin/FooPlugin.php` will not match and will not be loaded.
+To disable a plugin, just rename the directory, for instance: `_php-plugin-foo-bar-baz` will not match and therefore will not be loaded.
 
 ## Registration
 

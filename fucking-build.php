@@ -260,7 +260,8 @@ class MotherfuckingGenerator {
 
     private function loadPlugins(array $plugins): void {
         foreach ($plugins as $plugin) {
-            $plugin_file = "$this->cwd/plugins/$plugin/$plugin.php";
+            $file = str_replace(' ', '', ucwords(str_replace('-', ' ', $plugin))) . 'Plugin';
+            $plugin_file = "$this->cwd/plugins/php-plugin-$plugin/$file.php";
             if (!file_exists($plugin_file)) { continue; }
 
             require_once "$this->cwd/plugins/$plugin/$plugin.php";
