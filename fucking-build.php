@@ -214,6 +214,7 @@ class MotherfuckingGenerator {
 
     private function enrichFileData(array $file, string $type): array {
         $file['raw_content'] = $content = file_get_contents($file['pathname']);
+        $this->stripComments($content);
         return $this->hook('enrichFileData', array_merge($file, [
             'title' => $this->extractTitle($content),
             'content' => $content,
@@ -222,7 +223,6 @@ class MotherfuckingGenerator {
     }
 
     private function extractTitle(string &$markdown): string {
-        $markdown = $this->stripComments($markdown);
         if (preg_match('`^# (.+)\R+`', ltrim($markdown), $matches)) {
             $markdown = ltrim(substr($markdown, strlen($matches[0])));
             return $matches[1];
@@ -230,7 +230,7 @@ class MotherfuckingGenerator {
         return '';
     }
 
-    public function stripComments(string $content): string {
+    public function stripComments(string &$content): string {
         return preg_replace('`^\[//]: # (.*)$`m', '', $content);
     }
 
